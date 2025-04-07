@@ -1,0 +1,8 @@
+# Go build files 
+*.exe
+*.out
+*.test
+bin/
+vendor/
+*.log
+*.tmp
