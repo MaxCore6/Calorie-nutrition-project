@@ -16,6 +16,19 @@ type AppUser struct {
 	CardioPerWeek    int     // in minutes
 	StrengthTraining int     // in minutes
 	LevelInSports    string  // Amateur / Professional /
+	WeightHistory    []WeightLog
+	Activities []Activity // list of activity for day
+}
+
+type WeightLog struct {
+	Date   string
+	Weight float64
+}
+
+type Activity struct {
+	Name string // "Runnig" / "Gym" / "Swiming"
+	Duration_min int // Duration in minutes
+	Intesity string // "Low" / "medium" / "high"
 }
 
 func getActivityFactor(user AppUser) float64 {
@@ -36,7 +49,7 @@ func getActivityFactor(user AppUser) float64 {
 	if user.StepsPerDay < 5000 {
 		activityFactor -= 0.1
 	} else if user.StepsPerDay > 10000 {
-		activityFactor += 0.1
+		activityFactor += 0.5
 	}
 
 	if user.CardioPerWeek < 60 {
@@ -83,6 +96,55 @@ func calculatingCaloriePerDay(user AppUser) int {
 	return int(bmr)
 }
 
+func weightChange(user AppUser) string {
+	history := user.WeightHistory
+	n := len(history)
+
+	if n < 2 {
+		return "Not enough data for analyze weight change"
+	}
+
+	last := history[n-1].Weight
+	prev := history[n-2].Weight
+	diff := last - prev
+
+	if diff > 0 {
+		return fmt.Sprintf("You have gained weight : %.1f kg since your recent weight", -diff)
+	} else if diff < 0 {
+		return fmt.Sprintf("You have lost weight: %.1f kg since your recent weight", -diff)
+	} else {
+		return "Your weight has not changed since your last weight "
+	}
+}
+
+func caloriesBurned(activity Activity, weight float64) float64 {
+	metValues := map[string]float64{
+		"Running_high" : 10.0, 
+		"Running_medium" : 7.0, 
+		"Running_low" : 5.0, 
+		"Walking_high" : 4.0, 
+		"Walking_low" : 3.0, 
+		"Swimming" : 6.0, 
+		"Gym" : 5.0, 
+
+	}
+
+	met, ok := metValues[activity.Name]
+	if !ok {
+		met = 3.0 //  
+	}
+	return met * weight * float64(activity.Duration_min) / 60.0
+}
+
+func totalCaloriesBurned(user AppUser) float64 {
+	var total float64
+
+	for _, act := range user.Activities {
+		total += caloriesBurned(act, user.Height)
+	}
+	return total
+}
+
 func main() {
 	user := AppUser{
 		Name:             "Maksim Makarov",
@@ -96,8 +158,13 @@ func main() {
 		CardioPerWeek:    120,
 		StrengthTraining: 360,
 		LevelInSports:    "Amateur",
+		WeightHistory: []WeightLog{
+			{"2025-03-08", 99.0},
+			{"2025-04-08", 97.3},
+		},
 	}
 
 	calories := calculatingCaloriePerDay(user)
 	fmt.Printf("Recommended daily calories for %s: %d kcal\n", user.Name, calories)
+	fmt.Println(weightChange(user))
 }
