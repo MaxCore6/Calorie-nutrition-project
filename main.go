@@ -1,7 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"os"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type AppUser struct {
@@ -17,7 +21,7 @@ type AppUser struct {
 	StrengthTraining int     // in minutes
 	LevelInSports    string  // Amateur / Professional /
 	WeightHistory    []WeightLog
-	Activities []Activity // list of activity for day
+	Activities       []Activity
 }
 
 type WeightLog struct {
@@ -26,9 +30,9 @@ type WeightLog struct {
 }
 
 type Activity struct {
-	Name string // "Runnig" / "Gym" / "Swiming"
-	Duration_min int // Duration in minutes
-	Intesity string // "Low" / "medium" / "high"
+	Name         string
+	Duration_min int
+	Intensity    string
 }
 
 func getActivityFactor(user AppUser) float64 {
@@ -109,7 +113,7 @@ func weightChange(user AppUser) string {
 	diff := last - prev
 
 	if diff > 0 {
-		return fmt.Sprintf("You have gained weight : %.1f kg since your recent weight", -diff)
+		return fmt.Sprintf("You have gained weight : %.1f kg since your recent weight", diff)
 	} else if diff < 0 {
 		return fmt.Sprintf("You have lost weight: %.1f kg since your recent weight", -diff)
 	} else {
@@ -119,30 +123,17 @@ func weightChange(user AppUser) string {
 
 func caloriesBurned(activity Activity, weight float64) float64 {
 	metValues := map[string]float64{
-		"Running_high" : 10.0, 
-		"Running_medium" : 7.0, 
-		"Running_low" : 5.0, 
-		"Walking_high" : 4.0, 
-		"Walking_low" : 3.0, 
-		"Swimming" : 6.0, 
-		"Gym" : 5.0, 
-
+		"Running": 9.8,
+		"Walking": 3.5,
+		"Swiming": 6.0,
+		"Gym":     5.0,
 	}
 
 	met, ok := metValues[activity.Name]
 	if !ok {
-		met = 3.0 //  
+		met = 3.0
 	}
 	return met * weight * float64(activity.Duration_min) / 60.0
-}
-
-func totalCaloriesBurned(user AppUser) float64 {
-	var total float64
-
-	for _, act := range user.Activities {
-		total += caloriesBurned(act, user.Height)
-	}
-	return total
 }
 
 func main() {
@@ -162,9 +153,41 @@ func main() {
 			{"2025-03-08", 99.0},
 			{"2025-04-08", 97.3},
 		},
+		Activities: []Activity{
+			{
+				Name:         "Gym",
+				Duration_min: 60,
+				Intensity:    "high",
+			},
+		},
 	}
+	insertUser(user)
 
 	calories := calculatingCaloriePerDay(user)
 	fmt.Printf("Recommended daily calories for %s: %d kcal\n", user.Name, calories)
 	fmt.Println(weightChange(user))
+
+	for _, a := range user.Activities {
+		burned := caloriesBurned(a, user.Weight)
+		fmt.Printf("Activity: %s | Duration: %d min | Burned: %.2f kcal\n", a.Name, a.Duration_min, burned)
+	}
+}
+
+func insertUser(user AppUser) {
+	conn, err := pgx.Connect(context.Background(), "postgres://postgres:postgres@localhost:5432/calories")
+	if err != nil {
+		fmt.Println("Unable to connect to database:", err)
+		return
+	}
+	defer conn.Close(context.Background())
+
+	_, err = conn.Exec(context.Background(),
+		"INSERT INTO users (name, age, weight, height, gender, activity, goal) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+		"Max", 27, 98.5, 181.0, "male", "moderate", "lose_weight")
+	if err != nil {
+		fmt.Fprint(os.Stderr, "Insert failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println("User inserted successfully!")
 }
