@@ -1,8 +1,26 @@
-# Go build files 
+# Go build artifacts
 *.exe
 *.out
 *.test
-bin/
-vendor/
 *.log
 *.tmp
+
+# Binaries and build folders
+bin/
+build/
+dist/
+
+# Dependency directories (if not using Go modules)
+vendor/
+
+# Enviroment files 
+.env
+.env.*
+
+# IDE/editor folders
+.vscode/
+.idea/
+
+# OS files 
+.DS_Store
+Thumbs.db

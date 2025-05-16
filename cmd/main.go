@@ -161,7 +161,8 @@ func main() {
 			},
 		},
 	}
-	insertUser(user)
+	insertUser(user) // Added user
+	getAllUsers()    // Display all users
 
 	calories := calculatingCaloriePerDay(user)
 	fmt.Printf("Recommended daily calories for %s: %d kcal\n", user.Name, calories)
@@ -190,4 +191,41 @@ func insertUser(user AppUser) {
 	}
 
 	fmt.Println("User inserted successfully!")
+}
+
+func getAllUsers() {
+	conn, err := pgx.Connect(context.Background(), "postgres://postgres:postgres@localhost:5432/calories")
+	if err != nil {
+		fmt.Println("Unable to connect to database:", err)
+		return
+	}
+	defer conn.Close(context.Background())
+
+	rows, err := conn.Query(context.Background(), "SELECT id, name, age, weight, height, gender, activity, goal FROM users")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Query failed: %v\n", err)
+		os.Exit(1)
+	}
+	defer rows.Close()
+
+	fmt.Println("Users in the database:")
+	for rows.Next() {
+		var id int
+		var name string
+		var age int
+		var weight float64
+		var height float64
+		var gender string
+		var activity string
+		var goal string
+
+		err := rows.Scan(&id, &name, &age, &weight, &height, &gender, &activity, &goal)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Row scan failed: %v\n", err)
+			continue
+		}
+
+		fmt.Println("ID: %d | Name: %s | Age: %d | Weight: %.1f | Height : %.1f | Gender: %s | Activity: %s | Goal: %s\n",
+			id, name, age, weight, height, gender, activity, goal)
+	}
 }
